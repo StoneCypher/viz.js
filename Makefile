@@ -7,7 +7,7 @@ NODE ?= node
 VIZ_VERSION ?= $(shell $(NODE) -p "require('./package.json').version")-$(shell git rev-parse HEAD)
 EXPAT_VERSION = 2.2.9
 GRAPHVIZ_VERSION = 2.44.1
-EMSCRIPTEN_VERSION = 2.0.2
+EMSCRIPTEN_VERSION = 2.0.6
 
 EXPAT_SOURCE_URL = "https://github.com/libexpat/libexpat/releases/download/R_$(subst .,_,$(EXPAT_VERSION))/expat-$(EXPAT_VERSION).tar.gz"
 GRAPHVIZ_SOURCE_URL = "https://www2.graphviz.org/Packages/stable/portable_source/graphviz-$(GRAPHVIZ_VERSION).tar.gz"
@@ -169,7 +169,7 @@ build/asm.js build/node/render.mjs: ENVIRONMENT:=node
 build/browser/render.mjs: ENVIRONMENT:=worker
 build/node/render.mjs build/browser/render.mjs build/asm.js: build/render.o
 	$(CC) --version | grep $(EMSCRIPTEN_VERSION)
-	$(CC) $(LINK_FLAGS) -s ENVIRONMENT=$(ENVIRONMENT) -Oz -o $@ $< $(LINK_INCLUDES)
+	$(CC) $(LINK_FLAGS) -s ENVIRONMENT=$(ENVIRONMENT) -o $@ $< $(LINK_INCLUDES)
 
 dist/render_async.js: build/render_async.js | dist
 	sed 's/export default/module.exports=/' $< | $(TERSER) --toplevel > $@
@@ -182,22 +182,18 @@ async build build/node build/browser dist $(PREFIX_FULL) sync:
 .PHONY: expat–full
 expat-full: build-full/expat-$(EXPAT_VERSION) | $(PREFIX_FULL)
 	grep $(EXPAT_VERSION) $</expat_config.h
-	cd $< && $(EMCONFIGURE) ./configure --quiet --disable-shared --prefix=$(PREFIX_FULL) --libdir=$(PREFIX_FULL)/lib CFLAGS="-Oz -w"
-	cd $< && $(EMMAKE) $(MAKE) --quiet -C lib all install
+	cd $< && $(EMCONFIGURE) ./configure --disable-shared --prefix=$(PREFIX_FULL) --libdir=$(PREFIX_FULL)/lib CFLAGS="-Oz -w"
+	cd $< && $(EMMAKE) $(MAKE) -C lib all install
 
 .PHONY: graphviz-full
 graphviz-full: build-full/graphviz-$(GRAPHVIZ_VERSION) | $(PREFIX_FULL)
 	grep $(GRAPHVIZ_VERSION) $</graphviz_version.h
 	cd $< && ./configure --quiet
-	cd $</lib/gvpr && $(MAKE) --quiet mkdefs CFLAGS="-w"
-	[ `uname` != 'Darwin' ] || [ -f $</configure.ac.old ] || (\
-		cp $</configure.ac $</configure.ac.old && \
-		sed '/-headerpad_max_install_names/d' $</configure.ac.old > $</configure.ac \
-	)
-	cd $< && $(EMCONFIGURE) ./configure --quiet --without-sfdp --disable-ltdl --enable-static --disable-shared --prefix=$(PREFIX_FULL) --libdir=$(PREFIX_FULL)/lib CFLAGS="-Oz -w"
-	cd $< && $(EMMAKE) $(MAKE) --quiet lib plugin
-	cd $</lib && $(EMMAKE) $(MAKE) --quiet install
-	cd $</plugin && $(EMMAKE) $(MAKE) --quiet install
+	cd $</lib/gvpr && $(MAKE) mkdefs CFLAGS="-w"
+	cd $< && $(EMCONFIGURE) ./configure --without-sfdp --disable-ltdl --enable-static --disable-shared --prefix=$(PREFIX_FULL) --libdir=$(PREFIX_FULL)/lib CFLAGS="-Oz -w"
+	cd $< && $(EMMAKE) $(MAKE) lib plugin
+	cd $</lib && $(EMMAKE) $(MAKE) install
+	cd $</plugin && $(EMMAKE) $(MAKE) install
 
 
 build-full/expat-$(EXPAT_VERSION) build-full/graphviz-$(GRAPHVIZ_VERSION): build-full/%: sources/%.tar.gz
@@ -267,7 +263,7 @@ pack: all
 publish: CURRENT_VIZ_VERSION=$(shell $(NODE) -p "require('./package.json').version")
 publish:
 	@echo "Checking for clean git stage..."
-	@git diff --exit-code --quiet . || (\
+	@git diff --exit-code . || (\
 		echo "Working directory contains unstaged changes:" && \
 		git status --untracked-files=no --porcelain && \
 		echo "Stage, commit, stash, or discard those changes before publishing a new version." && \
@@ -309,7 +305,7 @@ endif
 			(k,v)=>k==="version"?"$(VIZ_VERSION)":v,\
 			2\
 		)+"\n")' && \
-	! git diff --exit-code --quiet package.json || (\
+	! git diff --exit-code package.json || (\
 		echo "You must specify a new version. Aborting." && \
 		echo "\033[3mHint: use \033[0mVIZ_VERSION=<newversion> make $@\033[3m to specify the new version number.\033[0m" >&2 && \
 		echo "\033[3mHint: current Viz version is \033[0m$(CURRENT_VIZ_VERSION)\033[3m, received \033[0m$(VIZ_VERSION)\033[3m.\033[0m" >&2 && \
