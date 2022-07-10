@@ -7,7 +7,6 @@ prefix-full/
 prefix-lite/
 sources/
 
-dist/
 /async/
 /sync/
 /wasm
